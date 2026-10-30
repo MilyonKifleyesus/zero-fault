@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zero Fault</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Zero Fault: night shift at Bay 03. Diagnose, lock out and repair battery-electric buses with your own hands, then test-drive them out. A Fleet Zero depot training game.">
+<link rel="icon" href="img/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=Big+Shoulders+Display:wght@800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one night shift read top to bottom, like a work order. Full-bleed key art, then the five real job steps as a
+   tabbed board, the fault list, the safety replay, TORQ, the Bay, then download and credits. One dark look on purpose:
+   it is the game's own night-shift palette, so the site and the game are one product. */
+:root {
+  color-scheme: dark;
+  --ink: #06080b;          /* the bay at night */
+  --ink-2: #0c1117;
+  --ink-3: #141b23;
+  --bone: #ece8e1;         /* text */
+  --steel: #b9c0c8;        /* secondary text */
+  --mute: #8a939e;
+  --line: rgba(236, 232, 225, .13);
+  --line-2: rgba(236, 232, 225, .26);
+  --hi: #ffc21a;           /* hi-vis yellow: TORQ and the next action */
+  --hi-ink: #1b1400;
+  --live: #ff6a13;         /* live HV, danger */
+  --safe: #22d37a;         /* dead, safe, done */
+  --f-display: "Big Shoulders Display", "Barlow Condensed", Impact, sans-serif;
+  --f-body: "Barlow", system-ui, sans-serif;
+  --f-cond: "Barlow Condensed", "Barlow", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --cut: 14px;
+  --wrap: 1240px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ink); color: var(--bone); font: 400 17px/1.55 var(--f-body); -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--ink); }
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+:focus-visible { outline: 2px solid var(--hi); outline-offset: 3px; }
+.wrap { width: 100%; max-width: calc(var(--wrap) + 2 * max(16px, env(safe-area-inset-left, 0px))); margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.cut { clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut))); }
+.kicker { margin: 0; font: 700 12px/1.3 var(--f-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--hi); }
+.h2 { margin: 0; font: 900 clamp(44px, 6.4vw, 88px)/.86 var(--f-display); text-transform: uppercase; letter-spacing: .005em; text-wrap: balance; }
+.lede { margin: 0; max-width: 60ch; color: var(--steel); font-size: 19px; }
+.tape { height: 12px; background: repeating-linear-gradient(-45deg, var(--hi) 0 14px, var(--ink) 14px 28px); }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; gap: 12px; min-height: 58px; padding: 0 26px; border: 0; text-decoration: none; cursor: pointer;
+  font: 800 24px/1 var(--f-display); text-transform: uppercase; letter-spacing: .03em; transition: transform .2s var(--ease), background-color .2s, color .2s; }
+.btn svg { width: 18px; height: 18px; flex: none; }
+.btn-hi { background: var(--hi); color: var(--hi-ink); }
+.btn-hi:hover { transform: translateY(-2px); background: #ffd24f; }
+.btn-ghost { background: rgba(6, 8, 11, .55); color: var(--bone); box-shadow: inset 0 0 0 1px var(--line-2); }
+.btn-ghost:hover { transform: translateY(-2px); box-shadow: inset 0 0 0 1px var(--hi); }
+@media (prefers-reduced-motion: reduce) { .btn, .btn:hover { transition: none; transform: none; } }
+
+/* top bar */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: rgba(6, 8, 11, .86); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 64px; }
+.brand { display: flex; align-items: center; gap: 14px; text-decoration: none; font: 700 12px/1 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--steel); }
+.brand svg { width: 112px; height: auto; color: var(--bone); }
+.brand span { padding-left: 14px; border-left: 1px solid var(--line-2); }
+.nav { display: flex; align-items: center; gap: 4px; }
+.nav a:not(.btn) { padding: 10px 12px; text-decoration: none; font: 600 15px/1 var(--f-cond); letter-spacing: .1em; text-transform: uppercase; color: var(--steel); }
+.nav a:not(.btn):hover { color: var(--bone); }
+.nav .btn { min-height: 42px; padding: 0 16px; margin-left: 8px; font-size: 18px; }
+@media (max-width: 860px) { .nav a:not(.btn), .brand span { display: none; } }
+
+/* hero: the key art, the wordmark, the two ways in */
+.hero { position: relative; overflow: hidden; background: var(--ink-2); }
+.hero-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 62% 40%; opacity: .92; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6, 8, 11, .94) 0%, rgba(6, 8, 11, .78) 34%, rgba(6, 8, 11, .1) 70%), linear-gradient(0deg, rgba(6, 8, 11, .9), transparent 30%); }
+.hero .wrap { position: relative; z-index: 1; padding-block: clamp(72px, 11vw, 150px) clamp(56px, 8vw, 110px); display: grid; gap: 26px; }
+.wordmark { margin: 0; display: grid; font: 900 clamp(96px, 17vw, 236px)/.8 var(--f-display); text-transform: uppercase; letter-spacing: -.005em; }
+.wordmark .o { color: transparent; -webkit-text-stroke: 3px var(--bone); }
+.hero .lede { color: var(--bone); max-width: 46ch; font-size: clamp(18px, 1.6vw, 21px); }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; padding: 0; list-style: none; font: 500 13px/1.4 var(--f-mono); letter-spacing: .06em; color: var(--steel); }
+.meta li { display: flex; align-items: center; gap: 8px; }
+.meta li::before { content: ""; width: 6px; height: 6px; background: var(--safe); }
+@media (prefers-reduced-motion: no-preference) {
+  .wordmark span { animation: rise .9s var(--ease) both; }
+  .wordmark span + span { animation-delay: .12s; }
+  .hero-tape { animation: slide 1.2s var(--ease) both; }
+}
+@keyframes rise { from { transform: translateY(18px); opacity: .001; } }
+@keyframes slide { from { transform: scaleX(0); transform-origin: left; } }
+
+section { padding-block: clamp(72px, 9vw, 128px); }
+.sec-head { display: grid; gap: 18px; margin-bottom: clamp(32px, 4vw, 56px); }
+
+/* the shift: the game's five real steps, one board */
+.shift { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(20px, 3vw, 44px); align-items: start; }
+.steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.step button { width: 100%; display: grid; grid-template-columns: 56px 1fr; gap: 4px 14px; padding: 18px 18px 18px 0; text-align: left; color: inherit; background: none; border: 0; border-top: 1px solid var(--line); cursor: pointer; font: inherit; }
+.step .n { grid-row: span 2; font: 900 44px/.9 var(--f-display); color: var(--mute); transition: color .2s; }
+.step b { font: 800 30px/1 var(--f-display); text-transform: uppercase; letter-spacing: .01em; }
+.step p { grid-column: 2; margin: 0; color: var(--steel); font-size: 16px; }
+.step button[aria-pressed="true"] { border-top-color: var(--hi); }
+.step button[aria-pressed="true"] .n, .step button:hover .n { color: var(--hi); }
+.step .shot { display: none; }
+.board { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 88px); display: grid; }
+.board figure { grid-area: 1 / 1; margin: 0; opacity: 0; transition: opacity .35s var(--ease); }
+.board figure.on { opacity: 1; }
+.board img, .frame img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--ink-3); }
+.board figcaption, .frame figcaption { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0 0; font: 500 12px/1.4 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+@media (max-width: 900px) {
+  .shift { grid-template-columns: 1fr; }
+  .board { display: none; }
+  .step .shot { display: block; grid-column: 1 / -1; margin-top: 12px; }
+  .step .shot img { aspect-ratio: 16 / 9; object-fit: cover; width: 100%; }
+}
+
+/* faults: the work-order board */
+.faults { background: var(--ink-2); }
+.table { overflow-x: auto; border-top: 2px solid var(--hi); }
+table { width: 100%; min-width: 760px; border-collapse: collapse; }
+th, td { padding: 16px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+th { font: 700 12px/1.2 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
+td { color: var(--steel); font-size: 16px; }
+td:first-child { color: var(--bone); font: 800 24px/1.05 var(--f-display); text-transform: uppercase; }
+.code { display: inline-block; padding: 4px 8px; font: 700 14px/1 var(--f-mono); letter-spacing: .04em; color: var(--ink); background: var(--hi); }
+.code.hv { background: var(--live); }
+.levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 28px; }
+.level { padding: 18px 20px 20px; background: var(--ink-3); }
+.level h3 { margin: 6px 0 8px; font: 900 34px/.9 var(--f-display); text-transform: uppercase; }
+.level p { margin: 0; color: var(--steel); font-size: 15px; }
+.level dl { display: flex; gap: 16px; margin: 12px 0 0; font: 500 12px/1.3 var(--f-mono); color: var(--mute); text-transform: uppercase; letter-spacing: .08em; }
+.level dd { margin: 2px 0 0; color: var(--bone); font-size: 15px; letter-spacing: 0; }
+@media (max-width: 760px) { .levels { grid-template-columns: 1fr; } }
+
+/* the safety replay: one big frame */
+.replay .wrap { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(24px, 4vw, 56px); align-items: center; }
+.frame { margin: 0; }
+.frame .rec { position: relative; }
+.frame .rec::before { content: "● REC  Safety replay · what would have happened"; position: absolute; left: 14px; top: 12px; z-index: 1; font: 700 12px/1 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: #ff4d5a; }
+.rules { display: grid; gap: 10px; margin: 22px 0 0; padding: 0; list-style: none; }
+.rules li { display: flex; gap: 12px; align-items: baseline; font: 800 26px/1 var(--f-display); text-transform: uppercase; }
+.rules li span { font: 700 12px/1 var(--f-mono); letter-spacing: .1em; color: var(--safe); }
+.quote { margin: 26px 0 0; padding-left: 16px; border-left: 3px solid var(--hi); color: var(--bone); font: 600 19px/1.4 var(--f-cond); }
+.quote cite { display: block; margin-top: 6px; font: 700 12px/1 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--hi); font-style: normal; }
+@media (max-width: 900px) { .replay .wrap { grid-template-columns: 1fr; } }
+
+/* TORQ */
+.torq { background: linear-gradient(180deg, var(--ink) 0%, var(--ink-2) 100%); }
+.torq .wrap { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); gap: clamp(24px, 5vw, 72px); align-items: center; }
+.torq-art { position: relative; }
+.torq-art img { width: min(100%, 440px); margin-inline: auto; filter: drop-shadow(0 30px 40px rgba(0, 0, 0, .55)); }
+.card { padding: 24px 26px 26px; background: var(--ink-3); position: relative; }
+.card::before { content: ""; position: absolute; inset: 0 0 auto; height: 8px; background: repeating-linear-gradient(-45deg, var(--hi) 0 10px, var(--ink) 10px 20px); }
+.card h3 { margin: 10px 0 2px; font: 900 64px/.85 var(--f-display); text-transform: uppercase; }
+.card .role { margin: 0 0 16px; color: var(--steel); font: 600 16px/1.3 var(--f-cond); letter-spacing: .03em; }
+.stats { display: grid; gap: 10px; margin: 0; }
+.stats div { display: grid; grid-template-columns: 110px 1fr 40px; gap: 14px; align-items: center; }
+.stats dt { font: 700 12px/1 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--steel); }
+.stats dd { margin: 0; height: 6px; background: var(--line); position: relative; }
+.stats dd::after { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(var(--v) * 100%); background: var(--hi); }
+.stats b { font: 700 14px/1 var(--f-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.says { display: grid; gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; }
+.says li { padding: 12px 16px; background: var(--bone); color: var(--ink); font: 600 17px/1.35 var(--f-body); }
+.says li::before { content: "TORQ"; display: block; margin-bottom: 4px; font: 700 11px/1 var(--f-mono); letter-spacing: .16em; color: #9a6b00; }
+@media (max-width: 900px) { .torq .wrap { grid-template-columns: 1fr; } .torq-art img { width: min(70%, 320px); } }
+
+/* the Bay */
+.bay .wrap { display: grid; gap: 28px; }
+.bay-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(20px, 3vw, 44px); align-items: start; }
+.shop { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.shop li { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.shop b { font: 800 21px/1.1 var(--f-display); text-transform: uppercase; }
+.shop span { grid-column: 1; color: var(--steel); font-size: 15px; }
+.shop .price { grid-row: 1 / span 2; grid-column: 2; align-self: center; font: 700 16px/1 var(--f-mono); color: var(--hi); font-variant-numeric: tabular-nums; }
+@media (max-width: 900px) { .bay-grid { grid-template-columns: 1fr; } }
+
+/* download */
+.download { background: var(--ink-2); }
+.dl-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.dl { display: grid; gap: 14px; align-content: start; padding: 24px 24px 26px; background: var(--ink-3); }
+.dl.main { box-shadow: inset 0 0 0 1px rgba(255, 194, 26, .5); }
+.dl h3 { margin: 0; font: 900 38px/.9 var(--f-display); text-transform: uppercase; }
+.dl p { margin: 0; color: var(--steel); font-size: 16px; }
+.dl .file { font: 500 13px/1.5 var(--f-mono); color: var(--mute); overflow-wrap: anywhere; }
+.dl .btn { justify-self: start; }
+.dl-note { display: none; padding: 12px 14px; font: 600 15px/1.35 var(--f-cond); letter-spacing: .02em; color: var(--steel); box-shadow: inset 0 0 0 1px var(--line-2); }
+[data-dl="preview"] .dl-live { display: none; }
+[data-dl="preview"] .dl-note { display: block; }
+.req { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(20px, 3vw, 44px); margin-top: clamp(40px, 5vw, 64px); }
+.req h3, .keys h3 { margin: 0 0 14px; font: 800 28px/1 var(--f-display); text-transform: uppercase; }
+.req dl { display: grid; margin: 0; }
+.req dl div { display: grid; grid-template-columns: 120px 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.req dt { font: 700 12px/1.6 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
+.req dd { margin: 0; color: var(--steel); }
+.keys ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; margin: 0; padding: 0; list-style: none; }
+.keys li { display: flex; align-items: center; gap: 12px; color: var(--steel); font-size: 16px; }
+kbd { display: inline-grid; place-items: center; min-width: 34px; height: 30px; padding: 0 8px; font: 700 13px/1 var(--f-mono); color: var(--bone); background: var(--ink); box-shadow: inset 0 0 0 1px var(--line-2), 0 2px 0 var(--line-2); }
+.smart { margin: 18px 0 0; color: var(--mute); font-size: 15px; }
+@media (max-width: 900px) { .dl-grid, .req { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .keys ul { grid-template-columns: 1fr; } .req dl div { grid-template-columns: 1fr; gap: 2px; } }
+
+/* credits */
+.credits .wrap { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 6fr); gap: clamp(24px, 4vw, 64px); }
+.crew { display: grid; gap: 18px; margin: 0; }
+.crew div { display: grid; gap: 4px; padding-left: 16px; border-left: 2px solid var(--hi); }
+.crew dt { font: 700 12px/1 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
+.crew dd { margin: 0; font: 800 30px/1.02 var(--f-display); text-transform: uppercase; }
+.libs { display: grid; margin: 0 0 24px; padding: 0; list-style: none; }
+.libs li { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.libs span { flex: none; font: 500 13px/1.5 var(--f-mono); color: var(--mute); }
+.credits h3 { margin: 0 0 12px; font: 700 12px/1 var(--f-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--steel); }
+.credits p { margin: 0; color: var(--steel); font-size: 16px; }
+@media (max-width: 900px) { .credits .wrap { grid-template-columns: 1fr; } }
+
+footer { border-top: 1px solid var(--line); }
+footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-block: 28px calc(28px + env(safe-area-inset-bottom, 0px)); }
+footer p { margin: 0; max-width: 70ch; color: var(--mute); font-size: 14px; }
+footer svg { width: 96px; height: auto; color: var(--steel); }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3.5v12m0 0l-5-5m5 5l5-5M4.5 20h15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square"/></symbol>
+</svg>
+
+<div class="site" data-dl="release">
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Zero Fault, top of page"><svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9.3071 1.0000"><path fill="currentColor" fill-rule="evenodd" d="M 0.5320,0.4132 L 0.5229,0.4095 L 0.0347,0.4095 L 0.0238,0.4113 L 0.0055,0.4241 L 0.0000,0.4369 L 0.0000,0.9488 L 0.0018,0.9579 L 0.0128,0.9744 L 0.0439,0.9836 L 0.1316,0.9836 L 0.1499,0.9781 L 0.1609,0.9653 L 0.1664,0.9433 L 0.1664,0.6015 L 0.1755,0.5795 L 0.1865,0.5704 L 0.1993,0.5667 L 0.5247,0.5649 L 0.5411,0.5521 L 0.5466,0.5393 L 0.5466,0.4351 L 0.5430,0.4241 Z M 6.3967,0.4205 L 6.3912,0.4369 L 6.3912,0.9506 L 6.3985,0.9689 L 6.4077,0.9781 L 6.4260,0.9836 L 6.9598,0.9836 L 6.9781,0.9708 L 6.9854,0.9506 L 6.9872,0.8775 L 6.9817,0.8464 L 6.9671,0.8300 L 6.9543,0.8263 L 6.5923,0.8263 L 6.5704,0.8172 L 6.5576,0.7989 L 6.5576,0.6015 L 6.5649,0.5832 L 6.5795,0.5704 L 6.5905,0.5667 L 6.9068,0.5667 L 6.9269,0.5631 L 6.9397,0.5521 L 6.9470,0.5283 L 6.9470,0.4442 L 6.9433,0.4260 L 6.9324,0.4132 L 6.9159,0.4077 L 6.4150,0.4077 Z M 2.8245,0.4205 L 2.8172,0.4406 L 2.8172,0.9378 L 2.8208,0.9598 L 2.8318,0.9762 L 2.8483,0.9836 L 3.3711,0.9836 L 3.3912,0.9799 L 3.4077,0.9671 L 3.4168,0.9378 L 3.4150,0.8592 L 3.4059,0.8373 L 3.3931,0.8281 L 3.0183,0.8263 L 3.0018,0.8208 L 2.9890,0.8080 L 2.9817,0.7861 L 2.9817,0.6051 L 2.9890,0.5850 L 3.0000,0.5740 L 3.0183,0.5667 L 3.3364,0.5667 L 3.3510,0.5631 L 3.3675,0.5503 L 3.3729,0.5356 L 3.3729,0.4351 L 3.3693,0.4241 L 3.3601,0.4150 L 3.3382,0.4077 L 2.8501,0.4077 L 2.8373,0.4113 Z M 1.8538,0.4223 L 1.8464,0.4424 L 1.8464,0.9488 L 1.8501,0.9616 L 1.8592,0.9744 L 1.8812,0.9836 L 2.3949,0.9836 L 2.4186,0.9817 L 2.4369,0.9708 L 2.4442,0.9470 L 2.4442,0.8647 L 2.4369,0.8391 L 2.4260,0.8300 L 2.4132,0.8263 L 2.0475,0.8263 L 2.0238,0.8190 L 2.0110,0.7989 L 2.0091,0.6399 L 2.0110,0.5996 L 2.0201,0.5795 L 2.0384,0.5686 L 2.0713,0.5649 L 2.3675,0.5667 L 2.3803,0.5631 L 2.3967,0.5484 L 2.4022,0.5320 L 2.4040,0.4497 L 2.4004,0.4296 L 2.3876,0.4150 L 2.3675,0.4077 L 1.8775,0.4077 L 1.8665,0.4113 Z M 3.7203,0.0183 L 3.7057,0.0311 L 3.6984,0.0530 L 3.7002,0.1462 L 3.7130,0.1664 L 3.7349,0.1737 L 3.9378,0.1737 L 3.9525,0.1792 L 3.9653,0.1956 L 3.9689,0.2194 L 3.9689,0.9543 L 3.9744,0.9689 L 3.9927,0.9817 L 4.0859,0.9836 L 4.1133,0.9781 L 4.1280,0.9653 L 4.1335,0.9488 L 4.1353,0.1974 L 4.1499,0.1792 L 4.1627,0.1737 L 4.3638,0.1737 L 4.3894,0.1664 L 4.3967,0.1591 L 4.4022,0.1408 L 4.4022,0.0512 L 4.3985,0.0366 L 4.3894,0.0238 L 4.3711,0.0164 Z M 2.8172,0.0494 L 2.8190,0.1517 L 2.8281,0.1664 L 2.8537,0.1755 L 3.3748,0.1737 L 3.3949,0.1664 L 3.4077,0.1462 L 3.4059,0.0402 L 3.3949,0.0238 L 3.3729,0.0164 L 2.8464,0.0164 L 2.8336,0.0219 L 2.8245,0.0311 Z M 1.8483,0.0439 L 1.8483,0.1481 L 1.8611,0.1664 L 1.8812,0.1737 L 2.4059,0.1737 L 2.4260,0.1664 L 2.4369,0.1462 L 2.4369,0.0457 L 2.4314,0.0329 L 2.4223,0.0238 L 2.4059,0.0164 L 1.8793,0.0164 L 1.8592,0.0256 Z M 0.0000,0.0475 L 0.0018,0.1499 L 0.0146,0.1682 L 0.0293,0.1737 L 0.5503,0.1737 L 0.5631,0.1682 L 0.5740,0.1499 L 0.5759,0.0512 L 0.5686,0.0292 L 0.5484,0.0164 L 0.0366,0.0164 L 0.0128,0.0238 Z M 7.3766,0.0201 L 7.3656,0.0311 L 7.3583,0.0530 L 7.3583,0.9433 L 7.3675,0.9726 L 7.3857,0.9836 L 7.4881,0.9836 L 7.5100,0.9762 L 7.5192,0.9671 L 7.5265,0.9452 L 7.5265,0.6526 L 7.5320,0.6344 L 7.5430,0.6234 L 7.5558,0.6179 L 7.5813,0.6179 L 7.6015,0.6271 L 7.6216,0.6490 L 7.8007,0.9342 L 7.8336,0.9744 L 7.8592,0.9836 L 7.9762,0.9854 L 7.9945,0.9799 L 8.0018,0.9726 L 8.0055,0.9616 L 8.0000,0.9378 L 7.9488,0.8647 L 7.8007,0.6344 L 7.8007,0.6161 L 7.8099,0.6033 L 7.8757,0.5686 L 7.9269,0.5283 L 7.9653,0.4698 L 7.9909,0.4077 L 8.0000,0.3693 L 8.0000,0.2742 L 7.9945,0.2431 L 7.9653,0.1682 L 7.9269,0.1152 L 7.8812,0.0749 L 7.8464,0.0548 L 7.7824,0.0292 L 7.7038,0.0164 L 7.4260,0.0146 Z M 7.5338,0.1865 L 7.5539,0.1737 L 7.7020,0.1755 L 7.7367,0.1846 L 7.7824,0.2102 L 7.8154,0.2468 L 7.8300,0.2943 L 7.8263,0.3638 L 7.8172,0.3839 L 7.7953,0.4150 L 7.7770,0.4314 L 7.7623,0.4388 L 7.7093,0.4570 L 7.6289,0.4644 L 7.5594,0.4644 L 7.5430,0.4589 L 7.5302,0.4442 L 7.5247,0.4150 L 7.5265,0.2029 Z M 6.9799,0.0494 L 6.9726,0.0292 L 6.9634,0.0201 L 6.9378,0.0146 L 6.4205,0.0164 L 6.4059,0.0219 L 6.3967,0.0311 L 6.3912,0.0439 L 6.3930,0.1499 L 6.4004,0.1645 L 6.4168,0.1737 L 6.9506,0.1737 L 6.9671,0.1682 L 6.9744,0.1609 L 6.9799,0.1444 Z M 6.0311,0.0219 L 6.0055,0.0146 L 5.3419,0.0164 L 5.3236,0.0274 L 5.3144,0.0512 L 5.3144,0.1408 L 5.3181,0.1572 L 5.3309,0.1700 L 5.3437,0.1737 L 5.7367,0.1737 L 5.7550,0.1865 L 5.7569,0.2011 L 5.7441,0.2267 L 5.7057,0.2834 L 5.6874,0.3181 L 5.6636,0.3510 L 5.6015,0.4552 L 5.5539,0.5247 L 5.5411,0.5503 L 5.4369,0.7111 L 5.3949,0.7843 L 5.3144,0.9068 L 5.2889,0.9561 L 5.2907,0.9708 L 5.2980,0.9781 L 5.3144,0.9836 L 5.9927,0.9836 L 6.0073,0.9799 L 6.0219,0.9689 L 6.0293,0.9488 L 6.0293,0.8611 L 6.0219,0.8409 L 6.0091,0.8300 L 5.9982,0.8263 L 5.5941,0.8263 L 5.5759,0.8135 L 5.5740,0.7916 L 5.7221,0.5576 L 5.7824,0.4552 L 5.8062,0.4223 L 5.8464,0.3528 L 5.9817,0.1426 L 6.0000,0.1079 L 6.0311,0.0640 L 6.0384,0.0457 L 6.0384,0.0347 Z M 0.9598,0.0201 L 0.9470,0.0311 L 0.9397,0.0494 L 0.9397,0.9415 L 0.9470,0.9671 L 0.9579,0.9781 L 0.9726,0.9836 L 1.4881,0.9836 L 1.5027,0.9799 L 1.5174,0.9671 L 1.5247,0.9470 L 1.5247,0.8629 L 1.5192,0.8446 L 1.5046,0.8300 L 1.4918,0.8263 L 1.1408,0.8263 L 1.1243,0.8208 L 1.1134,0.8117 L 1.1042,0.7861 L 1.1060,0.0494 L 1.0951,0.0238 L 1.0768,0.0146 L 0.9708,0.0164 Z M 8.7825,0.0000 L 8.7185,0.0073 L 8.6271,0.0329 L 8.5521,0.0695 L 8.4863,0.1188 L 8.4278,0.1810 L 8.3931,0.2304 L 8.3602,0.2962 L 8.3492,0.3400 L 8.3327,0.3839 L 8.3254,0.4223 L 8.3218,0.4735 L 8.3236,0.5558 L 8.3364,0.6271 L 8.3602,0.7038 L 8.3711,0.7276 L 8.4205,0.8080 L 8.4461,0.8409 L 8.4973,0.8903 L 8.5814,0.9452 L 8.6216,0.9634 L 8.6874,0.9854 L 8.7642,0.9982 L 8.8537,1.0000 L 8.9269,0.9890 L 9.0037,0.9653 L 9.0420,0.9488 L 9.1261,0.8940 L 9.1938,0.8281 L 9.2486,0.7459 L 9.2632,0.7148 L 9.2889,0.6417 L 9.3071,0.5302 L 9.3071,0.4607 L 9.2962,0.4113 L 9.2907,0.3620 L 9.2632,0.2834 L 9.2029,0.1828 L 9.1499,0.1261 L 9.0695,0.0658 L 8.9963,0.0311 L 8.9561,0.0183 L 8.8940,0.0055 L 8.8373,0.0000 Z M 8.8099,0.1536 L 8.8592,0.1572 L 8.9360,0.1792 L 8.9872,0.2047 L 9.0146,0.2249 L 9.0603,0.2724 L 9.0804,0.2998 L 9.1060,0.3455 L 9.1170,0.3711 L 9.1335,0.4314 L 9.1389,0.4698 L 9.1389,0.5356 L 9.1316,0.5740 L 9.1115,0.6417 L 9.0749,0.7093 L 9.0256,0.7642 L 8.9817,0.7971 L 8.9196,0.8263 L 8.8757,0.8391 L 8.8464,0.8428 L 8.7733,0.8428 L 8.6983,0.8227 L 8.6398,0.7916 L 8.5905,0.7514 L 8.5740,0.7349 L 8.5393,0.6874 L 8.5082,0.6179 L 8.4991,0.5832 L 8.4918,0.5046 L 8.4954,0.4424 L 8.5064,0.3857 L 8.5411,0.3108 L 8.5923,0.2450 L 8.6344,0.2102 L 8.6856,0.1828 L 8.7605,0.1609 Z"/></svg>
+<span>Depot training</span></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#shift">The shift</a><a href="#faults">Faults</a><a href="#torq">TORQ</a><a href="#download">Download</a><a href="#credits">Credits</a>
+      <a class="btn btn-hi cut" href="play/index.html"><svg aria-hidden="true"><use href="#i-play"/></svg>Play now</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="hero">
+    <img class="hero-art" src="img/keyart.webp" alt="TORQ, the shop robot, beside the black Fleet Zero electric bus on its lifts in Bay 03">
+    <div class="wrap">
+      <p class="kicker">Bay 03 · Electric bus service sim · v1.0.0</p>
+      <h1 class="wordmark"><span>Zero</span><span class="o">Fault</span></h1>
+      <p class="lede">Night shift at Bay 03. A battery-electric bus rolls in with the driver's complaint and a hidden fault. Read it, lock it out, fix it with your hands, and drive it out by dawn.</p>
+      <div class="ctas">
+        <a class="btn btn-hi cut" href="play/index.html"><svg aria-hidden="true"><use href="#i-play"/></svg>Play in your browser</a>
+        <a class="btn btn-ghost cut" href="#download"><svg aria-hidden="true"><use href="#i-down"/></svg>Download for Windows</a>
+      </div>
+      <ul class="meta"><li>Free</li><li>Windows 10 and 11</li><li>Chrome and Edge</li><li>Saves on your device</li></ul>
+    </div>
+    <div class="tape hero-tape" aria-hidden="true"></div>
+  </div>
+
+  <section id="shift" aria-labelledby="shift-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="kicker">The shift · three buses a night</p>
+        <h2 class="h2" id="shift-h">One bus. Five steps. Five minutes.</h2>
+        <p class="lede">Every job runs the same five steps the game checks off in your objective panel. Skip one and the bus doesn't leave the bay.</p>
+      </div>
+      <div class="shift">
+        <ol class="steps">
+          <li class="step"><button aria-pressed="true" data-step="0"><span class="n">01</span><b>Find the fault</b><p>Read the dash codes, sweep the thermal camera, put the meter on it, open panels and listen. Clues land on your work-order tablet, where you make the call.</p></button>
+            <figure class="shot"><img src="img/tablet.webp" alt="The work-order tablet with three clues and five suspects" loading="lazy"></figure></li>
+          <li class="step"><button aria-pressed="false" data-step="1"><span class="n">02</span><b>Make it safe</b><p>Gloves and face shield from the bench. Pull the HV disconnect, lock it, tag it with your name, wait for the DC link to drain, then test for dead.</p></button>
+            <figure class="shot"><img src="img/ppe_padlock_tag.webp" alt="A blue lockout padlock with a red danger tag" loading="lazy"></figure></li>
+          <li class="step"><button aria-pressed="false" data-step="2"><span class="n">03</span><b>Repair</b><p>Hold the ratchet on a bolt, click a plug's tab and pull, scrub the corrosion, seat the new part. R swaps the 10 and 13 mm sockets.</p></button>
+            <figure class="shot"><img src="img/repair.webp" alt="The coolant pump in the curb-side compartment, ratchet in hand" loading="lazy"></figure></li>
+          <li class="step"><button aria-pressed="false" data-step="3"><span class="n">04</span><b>Close up</b><p>Every panel shut, the LV cut-off back on, then CODES on the dash. Close up means "No active faults".</p></button>
+            <figure class="shot"><img src="img/inside.webp" alt="Inside the bus, the LV cabinet open behind the driver's seat" loading="lazy"></figure></li>
+          <li class="step"><button aria-pressed="false" data-step="4"><span class="n">05</span><b>Test drive</b><p>Out of the bay into the dawn yard: a cone slalom, then a regen stop inside the painted box.</p></button>
+            <figure class="shot"><img src="img/drive.webp" alt="The bus driving out of the bay on the test drive" loading="lazy"></figure></li>
+        </ol>
+        <div class="board" aria-hidden="true">
+          <figure class="on"><img class="cut" src="img/tablet.webp" alt=""><figcaption><span>Work order · FZ 051 · Tech</span><span>T opens the tablet</span></figcaption></figure>
+          <figure><img class="cut" src="img/ppe_padlock_tag.webp" alt="" style="object-position: 50% 42%"><figcaption><span>Lockout · your lock, your tag</span><span>Test for dead</span></figcaption></figure>
+          <figure><img class="cut" src="img/repair.webp" alt=""><figcaption><span>Curb side · ahead of the rear wheels</span><span>Ratchet · 10 mm</span></figcaption></figure>
+          <figure><img class="cut" src="img/inside.webp" alt=""><figcaption><span>LV cabinet · behind the driver</span><span>E steps inside</span></figcaption></figure>
+          <figure><img class="cut" src="img/drive.webp" alt=""><figcaption><span>Test drive · 1 of 3</span><span>C for the cab view</span></figcaption></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faults" class="faults" aria-labelledby="faults-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="kicker">Mystery faults · the driver's report is all you get</p>
+        <h2 class="h2" id="faults-h">Five faults. One is in this bus.</h2>
+      </div>
+      <div class="table">
+        <table>
+          <thead><tr><th scope="col">Fault</th><th scope="col">Where</th><th scope="col">Dash code</th><th scope="col">What it takes</th></tr></thead>
+          <tbody>
+            <tr><td>Blown 15 A fuse</td><td>LV cabinet, inside behind the driver</td><td><span class="code">LV-206</span></td><td>Fuse puller and a 15 A spare. Fit the 30 A and the wire becomes the fuse.</td></tr>
+            <tr><td>Corroded battery terminal</td><td>Battery compartment, curb side</td><td><span class="code">LV-112</span></td><td>Meter across post and clamp, LV cut-off off, ratchet at 13 mm, brush</td></tr>
+            <tr><td>Failed coolant pump</td><td>Curb side, ahead of the rear wheels</td><td><span class="code hv">TM-118</span></td><td>Thermal camera, LV cut-off, ratchet at 10 mm, a new pump from the floor</td></tr>
+            <tr><td>Loose HV connector</td><td>Junction box, rear street-side skirt</td><td><span class="code hv">HV-301</span></td><td>Full lockout, six lid bolts, test for dead, push connector 2 home</td></tr>
+            <tr><td>Damaged charge inlet</td><td>Curb-side charge port</td><td><span class="code">CH-044</span></td><td>Class 0 gloves first, meter on the DC pins, pull the foil, brush the scorch</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="levels">
+        <div class="level cut"><p class="kicker">Night 1</p><h3>Rookie</h3><p>Three suspects on the tablet, plain dash codes.</p><dl><div><dt>Wrong call</dt><dd>−15 s</dd></div><div><dt>Suspects</dt><dd>3</dd></div></dl></div>
+        <div class="level cut"><p class="kicker">Nights 2 and 3 · Daily Bus</p><h3>Tech</h3><p>All five faults are suspects. Read the clues.</p><dl><div><dt>Wrong call</dt><dd>−30 s</dd></div><div><dt>Suspects</dt><dd>5</dd></div></dl></div>
+        <div class="level cut"><p class="kicker">Night 4 on</p><h3>Master</h3><p>Two look-alikes join, the codes say less, and a stray code stays live.</p><dl><div><dt>Wrong call</dt><dd>−45 s</dd></div><div><dt>Suspects</dt><dd>7</dd></div></dl></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="replay" class="replay" aria-labelledby="replay-h">
+    <div class="wrap">
+      <figure class="frame">
+        <div class="rec"><img class="cut" src="img/replay.webp" alt="Safety replay: an arc flash at the HV junction box, with TORQ in the blast"></div>
+        <figcaption><span>Opened an energised HV junction box</span><span>650 V DC · Strike 1 of 3</span></figcaption>
+      </figure>
+      <div class="sec-head">
+        <p class="kicker">Safety replay</p>
+        <h2 class="h2" id="replay-h">Mistakes happen to TORQ.</h2>
+        <p class="lede">Do something unsafe and the game stops it before it happens, then shows what would have: in slow motion, with TORQ as the crash-test dummy, then a rewind. Three replays end the job.</p>
+        <ul class="rules"><li><span>01</span>Lock out</li><li><span>02</span>Test for dead</li><li><span>03</span>Then touch</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="torq" class="torq" aria-labelledby="torq-h">
+    <div class="wrap">
+      <div class="torq-art"><img src="img/torq_hero.webp" alt="TORQ, a shop robot with a screen for a face, a yellow hard hat and a hi-vis vest"></div>
+      <div>
+        <div class="card cut">
+          <p class="kicker">Your helper</p>
+          <h3 id="torq-h">TORQ</h3>
+          <p class="role">Shop bot · Safety lead · Comedian (unpaid)</p>
+          <dl class="stats">
+            <div><dt>Safety</dt><dd style="--v: 1"></dd><b>100</b></div>
+            <div><dt>Dad jokes</dt><dd style="--v: .94"></dd><b>94</b></div>
+            <div><dt>Patience</dt><dd style="--v: .72"></dd><b>72</b></div>
+          </dl>
+        </div>
+        <ul class="says">
+          <li>Locked is not dead. Test, then touch. My antenna is still smoking.</li>
+          <li>Same rating on every fuse. I still dream about the 30 amp incident.</li>
+          <li>Got it! Bolts in the bilge are a shift-ender.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="bay" class="bay" aria-labelledby="bay-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="kicker">The Bay · free upgrades, XP from every job</p>
+        <h2 class="h2" id="bay-h">Make the bay yours. It's all free.</h2>
+      </div>
+      <div class="bay-grid">
+        <figure class="frame"><img class="cut" src="img/bay.webp" alt="The Upgrade your bay screen with nine free upgrades"><figcaption><span>Upgrade your bay</span><span>Ranks: Apprentice to Master tech</span></figcaption></figure>
+        <ul class="shop">
+          <li><b>Tool wall</b><span>Cementex insulated tools, each in its painted outline</span><em class="price">Free</em></li>
+          <li><b>LED high-bays</b><span>Brighter, cleaner light on every panel</span><em class="price">Free</em></li>
+          <li><b>Coffee machine</b><span>Once a job, TORQ brews a cup: 15 seconds back</span><em class="price">Free</em></li>
+          <li><b>Shop radio</b><span>A slow workshop groove. TORQ has opinions.</span><em class="price">Free</em></li>
+          <li><b>Epoxy floor</b><span>Mirror finish. The bus reflects in it.</span><em class="price">Free</em></li>
+          <li><b>Neon sign</b><span>Your name in yellow neon over the door</span><em class="price">Free</em></li>
+          <li><b>Gold hard hat</b><span>For TORQ. Very shiny. He will mention it.</span><em class="price">Free</em></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="download" class="download" aria-labelledby="dl-h">
+    <div class="wrap">
+      <div class="sec-head">
+        <p class="kicker">Download · v1.0.0</p>
+        <h2 class="h2" id="dl-h">Take the night shift home.</h2>
+        <p class="lede">The desktop app runs offline and always picks your laptop's fast graphics chip. Saves stay on your computer.</p>
+      </div>
+      <div class="dl-grid">
+        <div class="dl main cut">
+          <p class="kicker">Windows · recommended</p>
+          <h3>Installer</h3>
+          <p>Start menu and desktop shortcuts. Uninstalls cleanly from Settings.</p>
+          <p class="file">ZeroFault-Setup-1.0.0.exe · 118 MB</p>
+          <a class="btn btn-hi cut dl-live" href="https://github.com/MilyonKifleyesus/zero-fault/releases/download/v1.0.0/ZeroFault-Setup-1.0.0.exe" download><svg aria-hidden="true"><use href="#i-down"/></svg>Download</a>
+          <p class="dl-note">This preview can't hand out files. Download it from the public site.</p>
+        </div>
+        <div class="dl cut">
+          <p class="kicker">Windows · no install</p>
+          <h3>Portable</h3>
+          <p>One file. Run it from any folder or a USB stick.</p>
+          <p class="file">ZeroFault-Portable-1.0.0.exe · 108 MB</p>
+          <a class="btn btn-ghost cut dl-live" href="https://github.com/MilyonKifleyesus/zero-fault/releases/download/v1.0.0/ZeroFault-Portable-1.0.0.exe" download><svg aria-hidden="true"><use href="#i-down"/></svg>Download</a>
+          <p class="dl-note">Download it from the public site, like the installer.</p>
+        </div>
+        <div class="dl cut">
+          <p class="kicker">Any computer · Chrome or Edge</p>
+          <h3>Browser</h3>
+          <p>Nothing to install. Loads in a few seconds and keeps your career in the browser.</p>
+          <p class="file">About 6 MB · WebGL 2</p>
+          <a class="btn btn-ghost cut" href="play/index.html"><svg aria-hidden="true"><use href="#i-play"/></svg>Play now</a>
+        </div>
+      </div>
+      <div class="req">
+        <div>
+          <h3>System requirements</h3>
+          <dl>
+            <div><dt>System</dt><dd>Windows 10 or 11, 64-bit</dd></div>
+            <div><dt>Graphics</dt><dd>Any DirectX 11 GPU. Laptops with two chips use the fast one.</dd></div>
+            <div><dt>Memory</dt><dd>4 GB</dd></div>
+            <div><dt>Disk</dt><dd>350 MB</dd></div>
+            <div><dt>Input</dt><dd>Mouse and keyboard</dd></div>
+          </dl>
+          <p class="smart">The installer isn't code-signed yet, so Windows SmartScreen may stop it the first time. Choose More info, then Run anyway.</p>
+        </div>
+        <div class="keys">
+          <h3>Before your first shift</h3>
+          <ul>
+            <li><kbd>1</kbd>–<kbd>8</kbd> Tools on your belt</li>
+            <li><kbd>Tab</kbd> Tool wheel</li>
+            <li><kbd>R</kbd> Swap 10 and 13 mm sockets</li>
+            <li><kbd>T</kbd> Work-order tablet</li>
+            <li><kbd>E</kbd> Step inside the bus</li>
+            <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Walk and drive</li>
+            <li><kbd>H</kbd> Ask TORQ for a hint</li>
+            <li><kbd>Esc</kbd> Step back or pause</li>
+            <li><kbd>C</kbd> Cab view on the test drive</li>
+            <li><kbd>F11</kbd> Fullscreen</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="credits" class="credits" aria-labelledby="credits-h">
+    <div class="wrap">
+      <div>
+        <div class="sec-head">
+          <p class="kicker">Credits</p>
+          <h2 class="h2" id="credits-h">The Bay 03 crew</h2>
+        </div>
+        <dl class="crew">
+          <div><dt>Created by</dt><dd>Milyon Kifleyesus</dd></div>
+          <div><dt>Shop bot, safety lead, comedian</dt><dd>TORQ, as himself</dd></div>
+          <div><dt>The bus</dt><dd>Fleet Zero XE40-NG, modelled part by part in Blender</dd></div>
+          <div><dt>Livery and depot</dt><dd>Fleet Zero</dd></div>
+          <div><dt>Code and build</dt><dd>With Claude (Anthropic)</dd></div>
+        </dl>
+      </div>
+      <div>
+        <h3>Built with</h3>
+        <ul class="libs">
+          <li>three.js<span>MIT</span></li>
+          <li>three-mesh-bvh<span>MIT</span></li>
+          <li>meshoptimizer<span>MIT</span></li>
+          <li>Electron (desktop app)<span>MIT</span></li>
+          <li>Big Shoulders Display, Barlow, Barlow Condensed, JetBrains Mono<span>SIL OFL 1.1</span></li>
+        </ul>
+        <h3>Reference</h3>
+        <p>Insulated hand tools and PPE are modelled after the 2024 Cementex catalogue. Fault codes, readings and procedures are game content, not a maker's service data.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9.3071 1.0000"><path fill="currentColor" fill-rule="evenodd" d="M 0.5320,0.4132 L 0.5229,0.4095 L 0.0347,0.4095 L 0.0238,0.4113 L 0.0055,0.4241 L 0.0000,0.4369 L 0.0000,0.9488 L 0.0018,0.9579 L 0.0128,0.9744 L 0.0439,0.9836 L 0.1316,0.9836 L 0.1499,0.9781 L 0.1609,0.9653 L 0.1664,0.9433 L 0.1664,0.6015 L 0.1755,0.5795 L 0.1865,0.5704 L 0.1993,0.5667 L 0.5247,0.5649 L 0.5411,0.5521 L 0.5466,0.5393 L 0.5466,0.4351 L 0.5430,0.4241 Z M 6.3967,0.4205 L 6.3912,0.4369 L 6.3912,0.9506 L 6.3985,0.9689 L 6.4077,0.9781 L 6.4260,0.9836 L 6.9598,0.9836 L 6.9781,0.9708 L 6.9854,0.9506 L 6.9872,0.8775 L 6.9817,0.8464 L 6.9671,0.8300 L 6.9543,0.8263 L 6.5923,0.8263 L 6.5704,0.8172 L 6.5576,0.7989 L 6.5576,0.6015 L 6.5649,0.5832 L 6.5795,0.5704 L 6.5905,0.5667 L 6.9068,0.5667 L 6.9269,0.5631 L 6.9397,0.5521 L 6.9470,0.5283 L 6.9470,0.4442 L 6.9433,0.4260 L 6.9324,0.4132 L 6.9159,0.4077 L 6.4150,0.4077 Z M 2.8245,0.4205 L 2.8172,0.4406 L 2.8172,0.9378 L 2.8208,0.9598 L 2.8318,0.9762 L 2.8483,0.9836 L 3.3711,0.9836 L 3.3912,0.9799 L 3.4077,0.9671 L 3.4168,0.9378 L 3.4150,0.8592 L 3.4059,0.8373 L 3.3931,0.8281 L 3.0183,0.8263 L 3.0018,0.8208 L 2.9890,0.8080 L 2.9817,0.7861 L 2.9817,0.6051 L 2.9890,0.5850 L 3.0000,0.5740 L 3.0183,0.5667 L 3.3364,0.5667 L 3.3510,0.5631 L 3.3675,0.5503 L 3.3729,0.5356 L 3.3729,0.4351 L 3.3693,0.4241 L 3.3601,0.4150 L 3.3382,0.4077 L 2.8501,0.4077 L 2.8373,0.4113 Z M 1.8538,0.4223 L 1.8464,0.4424 L 1.8464,0.9488 L 1.8501,0.9616 L 1.8592,0.9744 L 1.8812,0.9836 L 2.3949,0.9836 L 2.4186,0.9817 L 2.4369,0.9708 L 2.4442,0.9470 L 2.4442,0.8647 L 2.4369,0.8391 L 2.4260,0.8300 L 2.4132,0.8263 L 2.0475,0.8263 L 2.0238,0.8190 L 2.0110,0.7989 L 2.0091,0.6399 L 2.0110,0.5996 L 2.0201,0.5795 L 2.0384,0.5686 L 2.0713,0.5649 L 2.3675,0.5667 L 2.3803,0.5631 L 2.3967,0.5484 L 2.4022,0.5320 L 2.4040,0.4497 L 2.4004,0.4296 L 2.3876,0.4150 L 2.3675,0.4077 L 1.8775,0.4077 L 1.8665,0.4113 Z M 3.7203,0.0183 L 3.7057,0.0311 L 3.6984,0.0530 L 3.7002,0.1462 L 3.7130,0.1664 L 3.7349,0.1737 L 3.9378,0.1737 L 3.9525,0.1792 L 3.9653,0.1956 L 3.9689,0.2194 L 3.9689,0.9543 L 3.9744,0.9689 L 3.9927,0.9817 L 4.0859,0.9836 L 4.1133,0.9781 L 4.1280,0.9653 L 4.1335,0.9488 L 4.1353,0.1974 L 4.1499,0.1792 L 4.1627,0.1737 L 4.3638,0.1737 L 4.3894,0.1664 L 4.3967,0.1591 L 4.4022,0.1408 L 4.4022,0.0512 L 4.3985,0.0366 L 4.3894,0.0238 L 4.3711,0.0164 Z M 2.8172,0.0494 L 2.8190,0.1517 L 2.8281,0.1664 L 2.8537,0.1755 L 3.3748,0.1737 L 3.3949,0.1664 L 3.4077,0.1462 L 3.4059,0.0402 L 3.3949,0.0238 L 3.3729,0.0164 L 2.8464,0.0164 L 2.8336,0.0219 L 2.8245,0.0311 Z M 1.8483,0.0439 L 1.8483,0.1481 L 1.8611,0.1664 L 1.8812,0.1737 L 2.4059,0.1737 L 2.4260,0.1664 L 2.4369,0.1462 L 2.4369,0.0457 L 2.4314,0.0329 L 2.4223,0.0238 L 2.4059,0.0164 L 1.8793,0.0164 L 1.8592,0.0256 Z M 0.0000,0.0475 L 0.0018,0.1499 L 0.0146,0.1682 L 0.0293,0.1737 L 0.5503,0.1737 L 0.5631,0.1682 L 0.5740,0.1499 L 0.5759,0.0512 L 0.5686,0.0292 L 0.5484,0.0164 L 0.0366,0.0164 L 0.0128,0.0238 Z M 7.3766,0.0201 L 7.3656,0.0311 L 7.3583,0.0530 L 7.3583,0.9433 L 7.3675,0.9726 L 7.3857,0.9836 L 7.4881,0.9836 L 7.5100,0.9762 L 7.5192,0.9671 L 7.5265,0.9452 L 7.5265,0.6526 L 7.5320,0.6344 L 7.5430,0.6234 L 7.5558,0.6179 L 7.5813,0.6179 L 7.6015,0.6271 L 7.6216,0.6490 L 7.8007,0.9342 L 7.8336,0.9744 L 7.8592,0.9836 L 7.9762,0.9854 L 7.9945,0.9799 L 8.0018,0.9726 L 8.0055,0.9616 L 8.0000,0.9378 L 7.9488,0.8647 L 7.8007,0.6344 L 7.8007,0.6161 L 7.8099,0.6033 L 7.8757,0.5686 L 7.9269,0.5283 L 7.9653,0.4698 L 7.9909,0.4077 L 8.0000,0.3693 L 8.0000,0.2742 L 7.9945,0.2431 L 7.9653,0.1682 L 7.9269,0.1152 L 7.8812,0.0749 L 7.8464,0.0548 L 7.7824,0.0292 L 7.7038,0.0164 L 7.4260,0.0146 Z M 7.5338,0.1865 L 7.5539,0.1737 L 7.7020,0.1755 L 7.7367,0.1846 L 7.7824,0.2102 L 7.8154,0.2468 L 7.8300,0.2943 L 7.8263,0.3638 L 7.8172,0.3839 L 7.7953,0.4150 L 7.7770,0.4314 L 7.7623,0.4388 L 7.7093,0.4570 L 7.6289,0.4644 L 7.5594,0.4644 L 7.5430,0.4589 L 7.5302,0.4442 L 7.5247,0.4150 L 7.5265,0.2029 Z M 6.9799,0.0494 L 6.9726,0.0292 L 6.9634,0.0201 L 6.9378,0.0146 L 6.4205,0.0164 L 6.4059,0.0219 L 6.3967,0.0311 L 6.3912,0.0439 L 6.3930,0.1499 L 6.4004,0.1645 L 6.4168,0.1737 L 6.9506,0.1737 L 6.9671,0.1682 L 6.9744,0.1609 L 6.9799,0.1444 Z M 6.0311,0.0219 L 6.0055,0.0146 L 5.3419,0.0164 L 5.3236,0.0274 L 5.3144,0.0512 L 5.3144,0.1408 L 5.3181,0.1572 L 5.3309,0.1700 L 5.3437,0.1737 L 5.7367,0.1737 L 5.7550,0.1865 L 5.7569,0.2011 L 5.7441,0.2267 L 5.7057,0.2834 L 5.6874,0.3181 L 5.6636,0.3510 L 5.6015,0.4552 L 5.5539,0.5247 L 5.5411,0.5503 L 5.4369,0.7111 L 5.3949,0.7843 L 5.3144,0.9068 L 5.2889,0.9561 L 5.2907,0.9708 L 5.2980,0.9781 L 5.3144,0.9836 L 5.9927,0.9836 L 6.0073,0.9799 L 6.0219,0.9689 L 6.0293,0.9488 L 6.0293,0.8611 L 6.0219,0.8409 L 6.0091,0.8300 L 5.9982,0.8263 L 5.5941,0.8263 L 5.5759,0.8135 L 5.5740,0.7916 L 5.7221,0.5576 L 5.7824,0.4552 L 5.8062,0.4223 L 5.8464,0.3528 L 5.9817,0.1426 L 6.0000,0.1079 L 6.0311,0.0640 L 6.0384,0.0457 L 6.0384,0.0347 Z M 0.9598,0.0201 L 0.9470,0.0311 L 0.9397,0.0494 L 0.9397,0.9415 L 0.9470,0.9671 L 0.9579,0.9781 L 0.9726,0.9836 L 1.4881,0.9836 L 1.5027,0.9799 L 1.5174,0.9671 L 1.5247,0.9470 L 1.5247,0.8629 L 1.5192,0.8446 L 1.5046,0.8300 L 1.4918,0.8263 L 1.1408,0.8263 L 1.1243,0.8208 L 1.1134,0.8117 L 1.1042,0.7861 L 1.1060,0.0494 L 1.0951,0.0238 L 1.0768,0.0146 L 0.9708,0.0164 Z M 8.7825,0.0000 L 8.7185,0.0073 L 8.6271,0.0329 L 8.5521,0.0695 L 8.4863,0.1188 L 8.4278,0.1810 L 8.3931,0.2304 L 8.3602,0.2962 L 8.3492,0.3400 L 8.3327,0.3839 L 8.3254,0.4223 L 8.3218,0.4735 L 8.3236,0.5558 L 8.3364,0.6271 L 8.3602,0.7038 L 8.3711,0.7276 L 8.4205,0.8080 L 8.4461,0.8409 L 8.4973,0.8903 L 8.5814,0.9452 L 8.6216,0.9634 L 8.6874,0.9854 L 8.7642,0.9982 L 8.8537,1.0000 L 8.9269,0.9890 L 9.0037,0.9653 L 9.0420,0.9488 L 9.1261,0.8940 L 9.1938,0.8281 L 9.2486,0.7459 L 9.2632,0.7148 L 9.2889,0.6417 L 9.3071,0.5302 L 9.3071,0.4607 L 9.2962,0.4113 L 9.2907,0.3620 L 9.2632,0.2834 L 9.2029,0.1828 L 9.1499,0.1261 L 9.0695,0.0658 L 8.9963,0.0311 L 8.9561,0.0183 L 8.8940,0.0055 L 8.8373,0.0000 Z M 8.8099,0.1536 L 8.8592,0.1572 L 8.9360,0.1792 L 8.9872,0.2047 L 9.0146,0.2249 L 9.0603,0.2724 L 9.0804,0.2998 L 9.1060,0.3455 L 9.1170,0.3711 L 9.1335,0.4314 L 9.1389,0.4698 L 9.1389,0.5356 L 9.1316,0.5740 L 9.1115,0.6417 L 9.0749,0.7093 L 9.0256,0.7642 L 8.9817,0.7971 L 8.9196,0.8263 L 8.8757,0.8391 L 8.8464,0.8428 L 8.7733,0.8428 L 8.6983,0.8227 L 8.6398,0.7916 L 8.5905,0.7514 L 8.5740,0.7349 L 8.5393,0.6874 L 8.5082,0.6179 L 8.4991,0.5832 L 8.4918,0.5046 L 8.4954,0.4424 L 8.5064,0.3857 L 8.5411,0.3108 L 8.5923,0.2450 L 8.6344,0.2102 L 8.6856,0.1828 L 8.7605,0.1609 Z"/></svg>
+
+    <p>Zero Fault v1.0.0 · A Fleet Zero depot training game. Not affiliated with or endorsed by any bus maker or transit agency.</p>
+  </div>
+</footer>
+</div>
+
+<script>
+// the shift board: pick a step, its screenshot fades in (on phones each step shows its own shot instead)
+(() => {
+  const btns = [...document.querySelectorAll('.step button')], figs = [...document.querySelectorAll('.board figure')];
+  const show = i => { btns.forEach((b, j) => b.setAttribute('aria-pressed', String(j === i))); figs.forEach((f, j) => f.classList.toggle('on', j === i)); };
+  btns.forEach((b, i) => { b.addEventListener('click', () => show(i)); b.addEventListener('mouseenter', () => show(i)); b.addEventListener('focus', () => show(i)); });
+})();
+</script>
+
+</body>
+</html>
